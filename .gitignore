@@ -1,0 +1,5 @@
+# R history
+*.Rhistory
+
+# Data file
+cubsPitching.csv
