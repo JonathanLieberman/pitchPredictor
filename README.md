@@ -1,7 +1,7 @@
 # pitchPredictor
 Predicting pitch types based on MLB game status and pitch release
 
-This project was aimed to determine how well an MLB pitch type (fastball, curveball, etc.) can be predicted based on information available right when the ball leaves the pitcher's hand.
+This project was aimed at determining how well an MLB pitch type (fastball, curveball, etc.) can be predicted based on information available right when the ball leaves the pitcher's hand.
 
 Currently, this project uses `caret` (R package) to interface with `xgboost` (C code) to show that predicting a pitch type before the ball starts travelling is possible. The next challenge is developing a model which you can teach a batter.
 
