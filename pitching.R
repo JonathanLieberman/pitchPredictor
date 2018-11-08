@@ -70,38 +70,11 @@ vars <- c("player_name"
           , "man_on_1b"
           , "man_on_2b"
           , "man_on_3b"
-          ) 
+) 
 
 
-# Subset data
-pitchingSubset <- pitching %>%
-  filter(pitch_type != "null") %>% # drop rows with no pitch type
-  select(c(target, vars)) %>%
-  droplevels() # Not every pitcher throws all pitch types
-
-
-# Partition data
-set.seed(255)
-inTrain <- createDataPartition(y = pitchingSubset$pitch_type
-                               , p = .75
-                               , list = FALSE
-)
-
-train <- pitchingSubset[inTrain,]
-test <- pitchingSubset[-inTrain,]
-
-
-
-# Preprocessing
-pOut <- preProcessPitching(train
-                           , ignore = target
-                           )
-trainClean <- pOut$data
-plan <- pOut$plan
-testClean <- preProcessPitching(test
-                                , plan = plan
-                                , ignore = target
-                                )$data
+# Drop variables not in dataset (i.e. no Feature Engingeering)
+vars <- vars[vars %in% colnames(pitching)]
 
 
 # Set training controls
@@ -124,37 +97,46 @@ xgbTreeGrid <- expand.grid(nrounds = c(50, 75, 100)
                            )
 
 
-# Create model formula
-fmla <- createFormula(target = target
-                      , indVariables = colnames(trainClean)
-                      , logy = FALSE)
+# Build and tune model
+output <- buildSimpleModel(data = pitching
+                           , variables = vars
+                           , target = target
+                           , control = ctrl
+                           , xgbTreeGrid = xgbTreeGrid
+                           , holdout = .25
+                           )
 
 
-# Train model
-model <- train(fmla
-               , data = trainClean
-               , method = "xgbTree"
-               , metric = "Accuracy"
-               , preProc = c("nzv", "center", "scale")
-               , na.action = na.pass
-               , trControl = ctrl
-               , tuneGrid = xgbTreeGrid
-               , tuneLength = 1
-)
+# Parse output from training
+model <- output$model
+fmla <- output$formula
+trainData <- output$trainData
+testData <- output$testData
+plan <- output$plan
 
 
-# Prepare output
-test <- test %>% 
+# Use preprocess the testing data
+testClean <- preProcessPitching(testData
+                                , plan = plan
+                                , ignore = target
+                                )$data
+
+
+# Predict on the test data
+testData <- testData %>% 
   mutate(pred = predict(model, newdata = testClean))
 
+
 # Confusion matrix
-(confustionMatrix <- table(test$pitch_type, test$pred))
+(confustion <- table(testData$pitch_type, testData$pred))
+
 
 # Model accuracy
-(modelAccuracy <- mean(test$pitch_type == test$pred))
+(modelAccuracy <- mean(testData$pitch_type == testData$pred))
+
 
 # Aggregate pitches by count
-trainCounts <- train %>%
+trainCounts <- trainData %>%
   group_by(pitch_type) %>%
   summarize(count = n()) %>%
   mutate(percent = count/sum(count))
@@ -167,7 +149,7 @@ mostFrequentPitch <- trainCounts %>%
   as.character()
   
 # Baseline accuracy
-(baselineAccuracy <- mean(test$pitch_type == mostFrequentPitch))
+(baselineAccuracy <- mean(testData$pitch_type == mostFrequentPitch))
 
 
 

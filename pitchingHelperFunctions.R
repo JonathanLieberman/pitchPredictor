@@ -174,4 +174,66 @@ createFormula <-function(target
     # Add LHS of formula
     fmla <- as.formula(paste(LHS, RHS, sep = " ~ "))
     return(fmla)
-  }
+}
+
+
+# Build a model and test it
+buildSimpleModel <- function(data
+                             , variables
+                             , target
+                             , control
+                             , xgbTreeGrid
+                             , holdout = .25
+) {
+  
+  # Subset data
+  dataSubset <- data %>%
+    filter(pitch_type != "null") %>% # drop rows with no pitch type
+    select(c(target, variables)) %>%
+    droplevels() # Not every pitcher throws all pitch types
+  
+  
+  # Partition data
+  inTrain <- createDataPartition(y = dataSubset$pitch_type
+                                 , p = 1 - holdout
+                                 , list = FALSE
+  )
+  
+  trainData <- dataSubset[inTrain,]
+  testData <- dataSubset[-inTrain,]
+  
+  
+  # Preprocessing
+  pOut <- preProcessPitching(trainData
+                             , ignore = target
+  )
+  trainClean <- pOut$data
+  plan <- pOut$plan
+  
+  
+  # Create model formula
+  fmla <- createFormula(target = target
+                        , indVariables = colnames(trainClean)
+                        , logy = FALSE
+  )
+  
+  
+  # Train model
+  model <- train(fmla
+                 , data = trainClean
+                 , method = "xgbTree"
+                 , metric = "Accuracy"
+                 , preProc = c("nzv", "center", "scale")
+                 , na.action = na.pass
+                 , trControl = ctrl
+                 , tuneGrid = xgbTreeGrid
+                 , tuneLength = 1
+  )
+  
+  output <- list(model = model
+                 , formula = fmla
+                 , trainData = trainData
+                 , testData = testData
+                 , plan = plan
+  )
+}
